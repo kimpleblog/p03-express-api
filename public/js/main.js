@@ -1,0 +1,212 @@
+function loadPosts() {
+	try {
+		return JSON.parse(localStorage.getItem("posts")) || [];
+	} catch {
+		return [];
+	}
+}
+
+function savePosts(posts) {
+	localStorage.setItem("posts", JSON.stringify(posts));
+}
+
+(function seedIfEmpty() {
+	const existingPosts = loadPosts();
+	if (existingPosts.length === 0) {
+		const now = Date.now();
+		const sample = [
+			{
+				id: now - 2000,
+				title: "Welcome to Kimple Blog",
+				excerpt: "This is a vanilla JS blog powered by LocalStorage.",
+				content: "Hello DevOps! This is your starter content.",
+				tags: ["intro", "vanillajs"],
+				createdAt: now - 2000,
+				updatedAt: now - 2000,
+			},
+			{
+				id: now - 1000,
+				title: "Roadmap Week 2",
+				excerpt: "CRUD + Search with LocalStorage.",
+				content:
+					"In W2, you'll implement client-side CRUD, then add search/sort/pagination.",
+				tags: ["roadmap", "w2"],
+				createdAt: now - 1000,
+				updatedAt: now - 1000,
+			},
+		];
+		savePosts(sample);
+	}
+})();
+
+const postList = document.getElementById("postList");
+const searchInput = document.getElementById("searchInput");
+const sortSelect = document.getElementById("sortSelect");
+
+function matchesQuery(p, q) {
+	if (!q) return true;
+	const needle = q.toLowerCase();
+	const haystack = [
+		p.title || "",
+		p.excerpt || "",
+		p.content || "",
+		...(Array.isArray(p.tags) ? p.tags.map((t) => `#${t}`) : []),
+	]
+		.join(" ")
+		.toLowerCase();
+
+	return haystack.includes(needle);
+}
+
+function sortByMode(list, mode) {
+	const sortedPost = [...list];
+	if (mode === "oldest") {
+		sortedPost.sort((a, b) => a.createdAt - b.createdAt);
+	} else if (mode === "title") {
+		sortedPost.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+	} else {
+		sortedPost.sort((a, b) => b.createdAt - a.createdAt);
+	}
+	return sortedPost;
+}
+
+const pager = document.getElementById("pager");
+const PAGE_SIZE = 6;
+let page = 1;
+
+(() => {
+	const params = new URLSearchParams(location.search);
+	const q0 = params.get("q") ?? "";
+	const sort0 = params.get("sort") ?? "newest";
+	const p0 = parseInt(params.get("page") || "1", 10);
+
+	if (searchInput) searchInput.value = q0;
+	if (sortSelect) sortSelect.value = sort0;
+	if (Number.isFinite(p0) && p0 > 0) page = p0;
+})();
+
+function renderPager(totalPages) {
+	if (!pager) return;
+	if (totalPages <= 1) {
+		pager.innerHTML = "";
+		return;
+	}
+
+	pager.innerHTML = `
+		<button id="prevPage" class="px-3 py-1 rounded border disabled:opacity-40" ${
+			page === 1 ? "disabled" : ""
+		}>Prev</button>
+		<span class="text-sm">Page ${page} / ${totalPages}</span>
+		<button id="nextPage" class="px-3 py-1 rounded border disabled:opacity-40" ${
+			page === totalPages ? "disabled" : ""
+		}>Next</button>
+		
+	`;
+	document.getElementById("prevPage")?.addEventListener("click", () => {
+		if (page > 1) {
+			page--;
+			renderPosts();
+		}
+	});
+	document.getElementById("nextPage")?.addEventListener("click", () => {
+		if (page < totalPages) {
+			page++;
+			renderPosts();
+		}
+	});
+}
+
+function syncURL(q, sort, p) {
+	const params = new URLSearchParams();
+	if (q) params.set("q", q);
+	if (sort && sort !== "newest") params.set("sort", sort);
+	if (p > 1) params.set("page", String(p));
+
+	const qs = params.toString();
+	const href = qs ? `?${qs}` : location.pathname;
+	history.replaceState(null, "", href);
+}
+
+function renderPosts() {
+	const allposts = loadPosts();
+	const q = (searchInput?.value || "").trim();
+	const mode = sortSelect?.value || "newest";
+
+	if (allposts.length === 0) {
+		postList.innerHTML = `<li class="col-span-full text-center text-gray-500 py-10">There are currently no posts.</li>`;
+
+		if (pager) pager.innerHTML = "";
+		syncURL(q, mode, 1);
+		return;
+	}
+
+	const filteredPosts = allposts.filter((p) => matchesQuery(p, q));
+	if (filteredPosts.length === 0) {
+		postList.innerHTML = `<li class="col-span-full text-center text-gray-500 py-10">No posts matched</li>`;
+		if (pager) pager.innerHTML = "";
+		syncURL(q, mode, 1);
+		return;
+	}
+	const posts = sortByMode(filteredPosts, mode);
+
+	const totalPages = Math.max(1, Math.ceil(posts.length / PAGE_SIZE));
+	if (page > totalPages) page = totalPages;
+	const start = (page - 1) * PAGE_SIZE;
+	const pageItems = posts.slice(start, start + PAGE_SIZE);
+
+	postList.innerHTML = "";
+	for (const p of pageItems) {
+		const li = document.createElement("li");
+		li.className =
+			"bg-white rounded-lg shadow hover:shadow-md transition overflow-hidden";
+		const tags =
+			(p.tags || [])
+				.map(
+					(t) =>
+						`<button type="button"
+							data-tag="${t}"
+							class="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">
+							#${t}
+      					</button>`
+				)
+				.join(" ") || "";
+		li.innerHTML = `
+                <article class="p-6">
+                    <h2 class="font-semibold text-l">${p.title}</h2>
+                    <p class="font-light mt-1">${p.excerpt || ""}</p>
+                    <div class="flex items-center justify-between text-xs text-gray-500 pt-2">
+                        <div class="space-x-1">${tags}</div>
+                        <time>${new Date(p.createdAt).toDateString()}</time>
+                    </div>
+                    <div class="mt-4">
+                        <a href="post.html?id=${
+							p.id
+						}" class="text-blue-600 hover:underline">อ่านต่อ → </a>
+                    </div>
+                </article>
+        `;
+		postList.appendChild(li);
+	}
+	renderPager(totalPages);
+	syncURL(q, mode, page);
+}
+
+postList?.addEventListener("click", (e) => {
+	const btn = e.target.closest("[data-tag]");
+	if (!btn) return;
+	const tag = btn.dataset.tag;
+	if (searchInput) searchInput.value = `#${tag}`;
+	page = 1;
+	renderPosts();
+});
+
+searchInput?.addEventListener("input", () => {
+	page = 1;
+	renderPosts();
+});
+sortSelect?.addEventListener("change", () => {
+	page = 1;
+	renderPosts();
+});
+
+renderPosts();

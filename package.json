@@ -1,0 +1,24 @@
+{
+  "name": "p03-express-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kimpleblog/p03-express-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kimpleblog/p03-express-api/issues"
+  },
+  "homepage": "https://github.com/kimpleblog/p03-express-api#readme",
+  "description": "",
+  "dependencies": {
+    "express": "^5.1.0",
+    "uuid": "^13.0.0"
+  }
+}
