@@ -177,8 +177,7 @@ function renderManageList() {
 		editBtn.addEventListener("click", () => startEdit(p.id));
 
 		const delBtn = document.createElement("button");
-		delBtn.className =
-			"px-3 py-1 rounded border text-red-600 hover:bg-red-50";
+		delBtn.className = "px-3 py-1 rounded border text-red-600 hover:bg-red-50";
 		delBtn.textContent = "Delete";
 		delBtn.addEventListener("click", () => deletePost(p.id));
 

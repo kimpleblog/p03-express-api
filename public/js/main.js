@@ -1,44 +1,21 @@
-function loadPosts() {
+async function loadPosts() {
 	try {
-		return JSON.parse(localStorage.getItem("posts")) || [];
+		const res = await fetch("/api/posts");
+		if (!res.ok) throw new Error("Failed to fetch posts");
+		const items = await res.json();
+		return items.map((p) => ({
+			id: p.id,
+			title: p.title || "",
+			excerpt: p.excerpt || "",
+			content: p.body || "",
+			ttags: Array.isArray(p.tags) ? p.tags : [],
+			createdAt: p.createdAt ? new Date(p.createdAt).getTime() : Date.now(),
+			updatedAt: p.updatedAt ? new Date(p.createdAt).getTime() : Date.now(),
+		}));
 	} catch {
 		return [];
 	}
 }
-
-function savePosts(posts) {
-	localStorage.setItem("posts", JSON.stringify(posts));
-}
-
-(function seedIfEmpty() {
-	const existingPosts = loadPosts();
-	if (existingPosts.length === 0) {
-		const now = Date.now();
-		const sample = [
-			{
-				id: now - 2000,
-				title: "Welcome to Kimple Blog",
-				excerpt: "This is a vanilla JS blog powered by LocalStorage.",
-				content: "Hello DevOps! This is your starter content.",
-				tags: ["intro", "vanillajs"],
-				createdAt: now - 2000,
-				updatedAt: now - 2000,
-			},
-			{
-				id: now - 1000,
-				title: "Roadmap Week 2",
-				excerpt: "CRUD + Search with LocalStorage.",
-				content:
-					"In W2, you'll implement client-side CRUD, then add search/sort/pagination.",
-				tags: ["roadmap", "w2"],
-				createdAt: now - 1000,
-				updatedAt: now - 1000,
-			},
-		];
-		savePosts(sample);
-	}
-})();
-
 const postList = document.getElementById("postList");
 const searchInput = document.getElementById("searchInput");
 const sortSelect = document.getElementById("sortSelect");
@@ -127,8 +104,8 @@ function syncURL(q, sort, p) {
 	history.replaceState(null, "", href);
 }
 
-function renderPosts() {
-	const allposts = loadPosts();
+async function renderPosts() {
+	const allposts = await loadPosts();
 	const q = (searchInput?.value || "").trim();
 	const mode = sortSelect?.value || "newest";
 
@@ -180,8 +157,8 @@ function renderPosts() {
                     </div>
                     <div class="mt-4">
                         <a href="post.html?id=${
-							p.id
-						}" class="text-blue-600 hover:underline">อ่านต่อ → </a>
+													p.id
+												}" class="text-blue-600 hover:underline">อ่านต่อ → </a>
                     </div>
                 </article>
         `;
