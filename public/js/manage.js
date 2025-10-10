@@ -1,3 +1,33 @@
+async function api(url, options = {}) {
+	const res = await fetch(url, {
+		headers: { "Content-Type": "application/json" },
+		...options,
+	});
+	if (!res.ok) {
+		const msg = await res.text().catch(() => res.statusText);
+		throw new Error(`HTTP ${res.status} - ${msg}`);
+	}
+	return res.json();
+}
+
+let _postsCache = []; //keep recently fetched posts
+
+async function fetchPostsFromApi() {
+	const items = await api("/api/posts");
+	const posts = Array.isArray(items) ? items : [];
+
+	//normalize it
+	_postsCache = posts.map((post, index) => ({
+		id: post.id || post._id || String(index),
+		title: post.title || "",
+		content: post.content || post.body || "",
+		createdAt: post.createdAt ? new Date(post.createdAt).getTime() : Date.now(),
+	}));
+
+	return _postsCache;
+}
+
+function savePosts(_) {}
 function loadPosts() {
 	try {
 		const raw = localStorage.getItem("posts");
@@ -7,10 +37,6 @@ function loadPosts() {
 		localStorage.removeItem("posts");
 		return [];
 	}
-}
-
-function savePosts(posts) {
-	localStorage.setItem("posts", JSON.stringify(posts));
 }
 
 const form = document.getElementById("postForm");
@@ -58,16 +84,16 @@ function deletePost(id) {
 	showMsg("Deleted successfully.", "success");
 }
 
-form.addEventListener("submit", (e) => {
+form.addEventListener("submit", async (e) => {
 	e.preventDefault();
 
 	const title = titleInput.value.trim();
-	const excerpt = excerptInput.value.trim();
+	// const excerpt = excerptInput.value.trim();
 	const content = contentInput.value.trim();
-	const tags = tagsInput.value
-		.split(",")
-		.map((t) => t.trim())
-		.filter(Boolean);
+	// const tags = tagsInput.value
+	// 	.split(",")
+	// 	.map((t) => t.trim())
+	// 	.filter(Boolean);
 
 	const posts = loadPosts();
 	const now = Date.now();
@@ -93,27 +119,19 @@ form.addEventListener("submit", (e) => {
 			return;
 		}
 	} else {
-		const newPost = {
-			id: now,
-			title,
-			excerpt,
-			content,
-			tags,
-			createdAt: now,
-			updatedAt: now,
-		};
 		try {
-			posts.push(newPost);
-			savePosts(posts);
+			const created = await api("/api/posts", {
+				method: "POST",
+				body: JSON.stringify({ title, body: content }),
+			});
+
 			form.reset();
 			showMsg("Recording successful!!!", "success");
-			location.href = "index.html";
+
+			console.log("[created]", created);
 		} catch (err) {
-			showMsg(
-				"Failed to save (storage error). Try clearing some posts.",
-				"error"
-			);
 			console.log(err);
+			showMsg("Failed to save via API: " + err.message, "error");
 		}
 	}
 	renderManageList();
@@ -140,51 +158,67 @@ function showMsg(text, type = "success") {
 	showMsg._t = setTimeout(() => msg.classList.add("hidden"), 3000);
 }
 
-function renderManageList() {
-	const posts = loadPosts().sort((a, b) => b.createdAt - a.createdAt);
+async function renderManageList() {
 	listEl.innerHTML = "";
 
-	if (posts.length === 0) {
-		const li = document.createElement("li");
-		li.className = "p-4 text-gray-500 text-center";
-		li.textContent = "No posts yet.";
-		listEl.appendChild(li);
-		return;
+	try {
+		const posts = (await fetchPostsFromApi()).sort(
+			(a, b) => b.createdAt - a.createdAt
+		);
+
+		if (posts.length === 0) {
+			const li = document.createElement("li");
+			li.className = "p-4 text-gray-500 text-center";
+			li.textContent = "No posts yet.";
+			listEl.appendChild(li);
+			return;
+		}
+
+		posts.forEach((p) => {
+			const li = document.createElement("li");
+			li.className = "p-4 flex items-center justify-between gap-4";
+
+			const left = document.createElement("div");
+			left.className = "min-w-0";
+
+			const title = document.createElement("div");
+			title.className = "font-medium truncate";
+			title.textContent = p.title;
+
+			const meta = document.createElement("div");
+			meta.className = "text-xs text-gray-500";
+			meta.textContent = new Date(p.createdAt).toLocaleString();
+			left.append(title, meta);
+
+			const btns = document.createElement("div");
+			btns.className = "shrink-0 flex gap-2";
+
+			const editBtn = document.createElement("button");
+			editBtn.className = "px-3 py-1 rounded border hover:bg-gray-50";
+			editBtn.textContent = "Edit";
+			editBtn.addEventListener("click", () => startEdit(p.id));
+
+			const delBtn = document.createElement("button");
+			delBtn.className =
+				"px-3 py-1 rounded border text-red-600 hover:bg-red-50";
+			delBtn.textContent = "Delete";
+			delBtn.addEventListener("click", () => deletePost(p.id));
+
+			btns.append(editBtn, delBtn);
+			li.append(left, btns);
+			listEl.appendChild(li);
+		});
+	} catch (e) {
+		console.error(e);
+		showMsg("Failed to load posts from API: " + e.message, "error");
 	}
-
-	posts.forEach((p) => {
-		const li = document.createElement("li");
-		li.className = "p-4 flex items-center justify-between gap-4";
-
-		const left = document.createElement("div");
-		left.className = "min-w-0";
-
-		const title = document.createElement("div");
-		title.className = "font-medium truncate";
-		title.textContent = p.title;
-
-		const meta = document.createElement("div");
-		meta.className = "text-xs text-gray-500";
-		meta.textContent = new Date(p.createdAt).toLocaleString();
-		left.append(title, meta);
-
-		const btns = document.createElement("div");
-		btns.className = "shrink-0 flex gap-2";
-
-		const editBtn = document.createElement("button");
-		editBtn.className = "px-3 py-1 rounded border hover:bg-gray-50";
-		editBtn.textContent = "Edit";
-		editBtn.addEventListener("click", () => startEdit(p.id));
-
-		const delBtn = document.createElement("button");
-		delBtn.className = "px-3 py-1 rounded border text-red-600 hover:bg-red-50";
-		delBtn.textContent = "Delete";
-		delBtn.addEventListener("click", () => deletePost(p.id));
-
-		btns.append(editBtn, delBtn);
-		li.append(left, btns);
-		listEl.appendChild(li);
-	});
 }
 
-renderManageList();
+(async () => {
+	try {
+		await renderManageList();
+	} catch (e) {
+		console.error(e);
+		showMsg("Failed to load posts from API: " + e.message, "error");
+	}
+})();
