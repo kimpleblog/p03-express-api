@@ -51,13 +51,17 @@ const cancelBtn = document.getElementById("cancelEdit");
 let editingId = null;
 
 function startEdit(id) {
-	const post = loadPosts().find((p) => p.id === id);
-	if (!post) return;
+	const post = _postsCache.find((p) => p.id === id);
+	if (!post) {
+		showMsg("Post not found in cache.", "error");
+		return;
+	}
+
 	editingId = id;
 	titleInput.value = post.title || "";
 	excerptInput.value = post.excerpt || "";
 	contentInput.value = post.content || "";
-	tagsInput.value = (post.tags || []).join(", ");
+	tagsInput.value = Array.isArray(post.tags) ? post.tags.join(", ") : "";
 
 	form.querySelector('button[type="submit"]').textContent = "Update";
 	cancelBtn.classList.remove("hidden");
@@ -129,6 +133,9 @@ form.addEventListener("submit", async (e) => {
 			showMsg("Recording successful!!!", "success");
 
 			console.log("[created]", created);
+
+			await renderManageList();
+			return;
 		} catch (err) {
 			console.log(err);
 			showMsg("Failed to save via API: " + err.message, "error");
