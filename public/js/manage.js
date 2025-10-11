@@ -92,14 +92,13 @@ form.addEventListener("submit", async (e) => {
 	e.preventDefault();
 
 	const title = titleInput.value.trim();
-	// const excerpt = excerptInput.value.trim();
+	const excerpt = excerptInput.value.trim();
 	const content = contentInput.value.trim();
-	// const tags = tagsInput.value
-	// 	.split(",")
-	// 	.map((t) => t.trim())
-	// 	.filter(Boolean);
+	const tags = tagsInput.value
+		.split(",")
+		.map((t) => t.trim())
+		.filter(Boolean);
 
-	const posts = loadPosts();
 	const now = Date.now();
 
 	if (!title || !content) {
@@ -107,21 +106,22 @@ form.addEventListener("submit", async (e) => {
 		return;
 	}
 	if (editingId) {
-		const index = posts.findIndex((p) => p.id === editingId);
-		if (index !== -1) {
-			const updated = posts.map((p) =>
-				p.id === editingId
-					? { ...p, title, excerpt, content, tags, updatedAt: now }
-					: p
-			);
-			savePosts(updated);
-			showMsg("Updated!", "success");
-			resetForm();
-		} else {
-			showMsg("Post not found.", "error");
+		const exists = _postsCache.some((p) => p.id === editingId);
+		if (!exists) {
+			showMsg("Post not found in cache", "error");
 			resetForm();
 			return;
 		}
+
+		_postsCache = _postsCache.map((p) =>
+			p.id === editingId
+				? { ...p, title, excerpt, content, tags, updatedAt: now }
+				: p
+		);
+		showMsg("Updated (local)!", "success");
+		resetForm();
+		await renderManageList(true);
+		return;
 	} else {
 		try {
 			const created = await api("/api/posts", {
@@ -141,7 +141,7 @@ form.addEventListener("submit", async (e) => {
 			showMsg("Failed to save via API: " + err.message, "error");
 		}
 	}
-	renderManageList();
+	await renderManageList(true);
 });
 
 function showMsg(text, type = "success") {
@@ -165,13 +165,15 @@ function showMsg(text, type = "success") {
 	showMsg._t = setTimeout(() => msg.classList.add("hidden"), 3000);
 }
 
-async function renderManageList() {
+async function renderManageList(useCache = false) {
 	listEl.innerHTML = "";
 
 	try {
-		const posts = (await fetchPostsFromApi()).sort(
-			(a, b) => b.createdAt - a.createdAt
-		);
+		// const posts = (await fetchPostsFromApi()).sort(
+		// 	(a, b) => b.createdAt - a.createdAt
+		// );
+		const base = useCache ? _postsCache : await fetchPostsFromApi();
+		const posts = [...base].sort((a, b) => b.createdAt - a.createdAt);
 
 		if (posts.length === 0) {
 			const li = document.createElement("li");
