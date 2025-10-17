@@ -99,7 +99,7 @@ form.addEventListener("submit", async (e) => {
 		.map((t) => t.trim())
 		.filter(Boolean);
 
-	const now = Date.now();
+	// const now = Date.now();
 
 	if (!title || !content) {
 		showMsg("Title and Content must not be empty", "error");
@@ -113,15 +113,37 @@ form.addEventListener("submit", async (e) => {
 			return;
 		}
 
-		_postsCache = _postsCache.map((p) =>
-			p.id === editingId
-				? { ...p, title, excerpt, content, tags, updatedAt: now }
-				: p
-		);
-		showMsg("Updated (local)!", "success");
-		resetForm();
-		await renderManageList(true);
-		return;
+		// _postsCache = _postsCache.map((p) =>
+		// 	p.id === editingId
+		// 		? { ...p, title, excerpt, content, tags, updatedAt: now }
+		// 		: p
+		// );
+		// showMsg("Updated (local)!", "success");
+		// resetForm();
+		// await renderManageList(true);
+		// return;
+
+		const submitBtn = form.querySelector('button[type = "Submit"]');
+		submitBtn.disabled = true;
+		try {
+			await api(`api/posts/${editingId}`, {
+				method: "PUT",
+				body: JSON.stringify({
+					title,
+					body: content,
+				}),
+			});
+			showMsg("Updated on server!", "success");
+			resetForm();
+			await renderManageList();
+			return;
+		} catch (err) {
+			console.log(err);
+			showMsg("Failed to update via API:" + err.message + "error");
+			return;
+		} finally {
+			submitBtn.disabled = false;
+		}
 	} else {
 		try {
 			const created = await api("/api/posts", {
