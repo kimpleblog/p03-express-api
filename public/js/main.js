@@ -8,7 +8,7 @@ async function loadPosts() {
 			title: p.title || "",
 			excerpt: p.excerpt || "",
 			content: p.body || "",
-			ttags: Array.isArray(p.tags) ? p.tags : [],
+			tags: Array.isArray(p.tags) ? p.tags : [],
 			createdAt: p.createdAt ? new Date(p.createdAt).getTime() : Date.now(),
 			updatedAt: p.updatedAt ? new Date(p.createdAt).getTime() : Date.now(),
 		}));
