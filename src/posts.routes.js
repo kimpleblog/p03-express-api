@@ -11,7 +11,10 @@ const posts = [];
  *   id: string,
  *   title: string,
  *   body: string,
- *   createdAt: ISOString
+ *   excerpt: string,
+ *   tags: string[],
+ *   createdAt: ISOString,
+ *   updatedAt: ISOString
  * }
  */
 
@@ -29,16 +32,27 @@ router.get("/:id", (req, res) => {
 });
 
 router.post("/", (req, res) => {
-	const { title, body } = req.body || {};
+	const { title, body, excerpt = "", tags = [] } = req.body || {};
 	if (!title || !body) {
 		return res.status(400).json({ error: "title and body are required" });
 	}
+
+	const parsedTags = Array.isArray(tags)
+		? tags
+		: String(tags || "")
+				.split(",")
+				.map((t) => t.trim())
+				.filter(Boolean);
+
 	const now = new Date().toISOString();
 	const newPost = {
 		id: uuidv4(),
 		title: String(title).trim(),
 		body: String(body).trim(),
+		excerpt: String(excerpt).trim(),
+		tags: parsedTags,
 		createdAt: now,
+		updatedAt: now,
 	};
 
 	posts.unshift(newPost);
@@ -52,44 +66,31 @@ router.put("/:id", (req, res) => {
 		return res.status(404).json({ error: "Post not found" });
 	}
 
-	const { title, body } = req.body || {};
+	const { title, body, excerpt, tags } = req.body || {};
 	if (!title || !body) {
 		return res.status(400).json({ error: "title and body are required" });
 	}
 
+	const parsedTags =
+		tags == null
+			? posts[idx].tags
+			: Array.isArray(tags)
+				? tags
+				: String(tags)
+						.split(",")
+						.map((t) => t.trim())
+						.filter(Boolean);
+
 	const now = new Date().toISOString();
+
 	posts[idx] = {
 		...posts[idx],
 		title: String(title).trim(),
 		body: String(body).trim(),
+		excerpt: excerpt != null ? String(excerpt).trim() : posts[idx].excerpt,
+		tags: parsedTags,
 		updatedAt: now,
 	};
-
-	res.json(posts[idx]);
-});
-
-router.patch("/:id", (req, res) => {
-	const id = req.params.id;
-	const idx = posts.findIndex((p) => p.id === id);
-	if (idx === -1) {
-		return res.status(404).json({ error: "Post not found" });
-	}
-
-	const { title, body } = req.body || {};
-	if (title === undefined && body === undefined) {
-		return res
-			.status(400)
-			.json({ error: "Provide at least one field: title or body" });
-	}
-
-	const now = new Date().toISOString();
-	if (title !== undefined) {
-		posts[idx].title = String(title).trim();
-	}
-	if (body !== undefined) {
-		posts[idx].body = String(body).trim();
-	}
-	posts[idx].updatedAt = now;
 
 	res.json(posts[idx]);
 });

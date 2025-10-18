@@ -7,7 +7,13 @@ async function api(url, options = {}) {
 		const msg = await res.text().catch(() => res.statusText);
 		throw new Error(`HTTP ${res.status} - ${msg}`);
 	}
-	return res.json();
+	// return res.json();
+	const text = await res.text();
+	try {
+		return text ? JSON.parse(text) : null;
+	} catch {
+		return text;
+	}
 }
 
 let _postsCache = []; //keep recently fetched posts
@@ -16,27 +22,20 @@ async function fetchPostsFromApi() {
 	const items = await api("/api/posts");
 	const posts = Array.isArray(items) ? items : [];
 
-	//normalize it
-	_postsCache = posts.map((post, index) => ({
-		id: post.id || post._id || String(index),
-		title: post.title || "",
-		content: post.content || post.body || "",
-		createdAt: post.createdAt ? new Date(post.createdAt).getTime() : Date.now(),
-	}));
+	_postsCache = posts
+		.filter((post) => post.id || post._id)
+		.map((post) => ({
+			id: post.id || post._id,
+			title: post.title || "",
+			content: post.content || post.body || "",
+			excerpt: post.excerpt ?? "",
+			tags: Array.isArray(post.tags) ? post.tags : [],
+			createdAt: post.createdAt
+				? new Date(post.createdAt).getTime()
+				: Date.now(),
+		}));
 
 	return _postsCache;
-}
-
-function savePosts(_) {}
-function loadPosts() {
-	try {
-		const raw = localStorage.getItem("posts");
-		const data = raw ? JSON.parse(raw) : [];
-		return Array.isArray(data) ? data : [];
-	} catch {
-		localStorage.removeItem("posts");
-		return [];
-	}
 }
 
 const form = document.getElementById("postForm");
@@ -132,24 +131,16 @@ form.addEventListener("submit", async (e) => {
 			return;
 		}
 
-		// _postsCache = _postsCache.map((p) =>
-		// 	p.id === editingId
-		// 		? { ...p, title, excerpt, content, tags, updatedAt: now }
-		// 		: p
-		// );
-		// showMsg("Updated (local)!", "success");
-		// resetForm();
-		// await renderManageList(true);
-		// return;
-
-		const submitBtn = form.querySelector('button[type = "Submit"]');
+		const submitBtn = form.querySelector('button[type="submit"]');
 		submitBtn.disabled = true;
 		try {
-			await api(`api/posts/${editingId}`, {
+			await api(`/api/posts/${editingId}`, {
 				method: "PUT",
 				body: JSON.stringify({
 					title,
 					body: content,
+					excerpt,
+					tags,
 				}),
 			});
 			showMsg("Updated on server!", "success");
@@ -158,7 +149,7 @@ form.addEventListener("submit", async (e) => {
 			return;
 		} catch (err) {
 			console.log(err);
-			showMsg("Failed to update via API:" + err.message + "error");
+			showMsg("Failed to update via API: " + err.message, "error");
 			return;
 		} finally {
 			submitBtn.disabled = false;
@@ -167,7 +158,7 @@ form.addEventListener("submit", async (e) => {
 		try {
 			const created = await api("/api/posts", {
 				method: "POST",
-				body: JSON.stringify({ title, body: content }),
+				body: JSON.stringify({ title, body: content, excerpt, tags }),
 			});
 
 			form.reset();
@@ -182,7 +173,6 @@ form.addEventListener("submit", async (e) => {
 			showMsg("Failed to save via API: " + err.message, "error");
 		}
 	}
-	await renderManageList(true);
 });
 
 function showMsg(text, type = "success") {
