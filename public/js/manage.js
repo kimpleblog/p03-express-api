@@ -79,13 +79,32 @@ cancelBtn.addEventListener("click", () => {
 	resetForm();
 });
 
-function deletePost(id) {
+async function deletePost(id) {
 	if (!confirm("Delete this post?")) return;
-	const posts = loadPosts().filter((p) => p.id !== id);
-	savePosts(posts);
-	if (editingId === id) resetForm();
-	renderManageList();
-	showMsg("Deleted successfully.", "success");
+
+	const wasEditing = editingId === id;
+
+	const backup = _postsCache.slice();
+	_postsCache = _postsCache.filter((p) => p.id !== id);
+
+	if (wasEditing) {
+		resetForm();
+	}
+
+	await renderManageList(true);
+
+	try {
+		await api(`/api/posts/${id}`, { method: "DELETE" });
+		showMsg("Deleted on server!", "success");
+		await renderManageList();
+		return;
+	} catch (err) {
+		console.log(err);
+		_postsCache = backup;
+		await renderManageList(true);
+		showMsg("Failed to delete via API: " + err.message, "error");
+		return;
+	}
 }
 
 form.addEventListener("submit", async (e) => {
