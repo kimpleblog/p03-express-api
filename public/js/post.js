@@ -85,10 +85,15 @@ function renderPost(post) {
 	tagsBox.className = "space-x-1 ";
 	const tags = Array.isArray(post.tags) ? post.tags : [];
 	tags.forEach((t) => {
-		const badge = document.createElement("span");
-		badge.className = "text-xs bg-gray-100 px-3 py-1 rounded";
-		badge.textContent = `#${t}`;
-		tagsBox.appendChild(badge);
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className =
+			"text-xs bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 rounded";
+		btn.textContent = `#${t}`;
+		btn.addEventListener("click", () => {
+			location.href = `./?q=${encodeURIComponent("#" + t)}`;
+		});
+		tagsBox.appendChild(btn);
 	});
 
 	const time = document.createElement("time");
