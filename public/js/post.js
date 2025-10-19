@@ -1,17 +1,42 @@
-function loadPosts() {
+async function api(url, options = {}) {
+	const res = await fetch(url, {
+		headers: { Content: "application/json" },
+		...options,
+	});
+	if (!res.ok) {
+		const msg = await res.text().catch(() => res.statusText);
+		throw new Error(`HTTP ${res.status} - ${msg}`);
+	}
+	const text = await res.text();
 	try {
-		const raw = localStorage.getItem("posts");
-		const data = raw ? JSON.parse(raw) : [];
-		return Array.isArray(data) ? data : [];
+		return text ? JSON.parse(text) : null;
 	} catch {
-		localStorage.removeItem("posts");
-		return [];
+		return text;
 	}
 }
+
+function normalize(post) {
+	if (!post) return null;
+	return {
+		id: post.id || post._id,
+		title: post.title || "",
+		excerpt: post.excerpt ?? "",
+		content: post.content || post.body || "",
+		tags: Array.isArray(post.tags) ? post.tags : [],
+		createdAt: post.createdAt ? new Date(post.createdAt).getTime() : Date.now(),
+		updatedAt: post.updatedAt ? new Date(post.updatedAt).getTime() : undefined,
+	};
+}
+
+async function fetchPostById(id) {
+	const raw = await api(`/api/posts/${id}`);
+	return normalize(raw);
+}
+
 function getPostId() {
 	const url = new URL(location.href);
 	const v = url.searchParams.get("id");
-	return Number(v);
+	return v ? String(v).trim() : "";
 }
 
 const container = document.getElementById("postContainer");
@@ -88,10 +113,17 @@ function renderPost(post) {
 	container.appendChild(article);
 }
 
-const id = getPostId();
-if (!Number.isFinite(id)) {
-	renderNotFound();
-} else {
-	const post = loadPosts().find((p) => p.id === id);
-	post ? renderPost(post) : renderNotFound();
-}
+(async () => {
+	const id = getPostId();
+	if (!id) {
+		renderNotFound();
+		return;
+	}
+	try {
+		const post = await fetchPostById(id);
+		post ? renderPost(post) : renderNotFound();
+	} catch (err) {
+		console.log(err);
+		renderNotFound();
+	}
+})();
