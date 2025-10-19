@@ -108,6 +108,7 @@ async function renderPosts() {
 	const allposts = await loadPosts();
 	const q = (searchInput?.value || "").trim();
 	const mode = sortSelect?.value || "newest";
+	const activeTag = q.startsWith("#") ? q.slice(1).toLowerCase() : "";
 
 	if (allposts.length === 0) {
 		postList.innerHTML = `<li class="col-span-full text-center text-gray-500 py-10">There are currently no posts.</li>`;
@@ -138,14 +139,20 @@ async function renderPosts() {
 			"bg-white rounded-lg shadow hover:shadow-md transition overflow-hidden";
 		const tags =
 			(p.tags || [])
-				.map(
-					(t) =>
-						`<button type="button"
-							data-tag="${t}"
-							class="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">
-							#${t}
-      					</button>`
-				)
+				.map((t) => {
+					const isActive = activeTag && t.toLowerCase() == activeTag;
+					const baseCls = "text-xs px-2 py-1 rounded border";
+					const normal = "bg-gray-100 hover:bg-gray-200 border-transparent";
+					const active = "bg-blue-600 text-white border-blue-600";
+					const cls = `${baseCls} ${isActive ? active : normal}`;
+					return `<button type="button"
+						data-tag="${t}"
+						class="${cls}" 
+						aria-pressed="${isActive ? "true" : "false"}">
+						#${t}
+					</button>
+						`;
+				})
 				.join(" ") || "";
 		li.innerHTML = `
                 <article class="p-6">
